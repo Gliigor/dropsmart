@@ -1,0 +1,13 @@
+{
+  "version": 2,
+  "framework": "nextjs",
+  "buildCommand": "npm run build",
+  "devCommand": "npm run dev",
+  "installCommand": "npm install",
+  "env": {
+    "ORS_API_KEY": "@ors_api_key",
+    "SUPABASE_SERVICE_KEY": "@supabase_service_key",
+    "ADMIN_SECRET_KEY": "@admin_secret_key",
+    "WALKING_COST_PER_MINUTE": "0.40"
+  }
+}
