@@ -6,33 +6,28 @@
 
 ## What it does
 
-DropSmart helps you find cheaper drop-off points near your destination. By getting dropped off a few minutes' walk away, you can save €2–10+ per ride. The app:
+DropSmart answers one question: **is getting dropped off a few minutes early actually worth it?**
 
-1. Takes your pickup and destination
-2. Generates candidate drop-off points at 250m–1200m from your destination
-3. Estimates fares for each alternative using Uber/Bolt Amsterdam pricing
-4. Calculates a savings score accounting for walking time (value of your time)
-5. Shows the best options on an interactive map
+Most of the time the honest answer is "no": Uber and Bolt fares are dominated by base and minimum charges, so a drop-off 500 m closer saves about a euro, and the walk costs more than that in time. DropSmart says so. It only recommends walking when it clearly wins:
 
-## Fare Estimation
-
-Uber/Bolt do not have public APIs. Fares are estimated using known Amsterdam pricing:
-
-| Provider | Base | Per km | Per min |
-|----------|------|--------|---------|
-| Uber | €2.50 | €1.20 | €0.20 |
-| Bolt | €1.80 | €0.95 | €0.15 |
-
-All prices are clearly labeled as **Estimated**.
-
-## Scoring Algorithm
+1. Geocodes pickup and destination (Nominatim).
+2. Lays candidate drop-offs on the pickup-facing side of the destination (a drop-off on the far side can only cost more).
+3. Routes the ride on the **real road network** (OSRM) and snaps every candidate to a drivable road, so one-way streets, canals and car-free zones are counted and no drop-off is in a park.
+4. Prices each option, scaled to the **real quote** you type in from the app (this captures surge).
+5. Compares the whole journey with the direct ride:
 
 ```
-score = rideCost + (walkingMinutes × walkingCostPerMinute)
-walkingCostPerMinute = €0.40 (configurable)
+savings  = directFare - fare
+timeCost = ((drive + walk) - (directDrive + directWalk)) x valueOfTime
+net      = savings - timeCost        # walk only if net >= EUR 1
 ```
 
-Lower score = better deal. Alternatives with savings < €2 are filtered out.
+`timeCost` can be negative: when the destination is behind a long detour, dropping off nearby and walking can be cheaper **and** faster. That is where the tool genuinely earns its keep.
+
+## Fare model (read this)
+
+Uber and Bolt have no public price API. Without a quote, a fare is modelled as
+`max(minFare, base + perKm x km + perMin x minutes)` using the real driving distance and time (`src/lib/fare.ts`). **These rates are unverified defaults**, and the minimum fares are assumptions. Enter the price your app shows for the direct ride and every estimate is scaled to it; the results panel labels which one you are looking at. Each option also has a box to enter the real price for that drop-off, which gives the true net gain.
 
 ## Tech Stack
 
@@ -40,35 +35,29 @@ Lower score = better deal. Alternatives with savings < €2 are filtered out.
 - **Language**: TypeScript
 - **Styling**: TailwindCSS (dark mode, mobile-first)
 - **Maps**: Leaflet + react-leaflet (OpenStreetMap)
-- **Geocoding**: Nominatim (free, no API key)
-- **Walking routes**: OpenRouteService
-- **Database**: Supabase (analytics + rate limiting)
+- **Geocoding**: Nominatim (free, throttled to 1 req/s)
+- **Driving routes**: OSRM `table` (one request for all candidates)
+- **Walking routes**: OpenRouteService matrix + directions (optional key)
+- **Database**: Supabase (optional analytics)
+- **Tests**: Vitest
 
 ## Setup
 
-### 1. Clone & install
-
 ```bash
-git clone https://github.com/Gliigor/gligor.git
-cd gligor/dropsmart
+git clone https://github.com/Gliigor/dropsmart.git
+cd dropsmart
 npm install
+cp .env.example .env.local   # all variables are optional, see the comments inside
+npm run dev                  # http://localhost:3000
 ```
-
-### 2. Environment variables
 
 ```bash
-cp .env.example .env.local
+npm test          # unit + pipeline tests (routing services are stubbed, no network needed)
+npm run typecheck
+npm run build
 ```
 
-Fill in:
-- `ORS_API_KEY`: Get free key at [openrouteservice.org](https://openrouteservice.org)
-- `NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_ANON_KEY`: From your Supabase project
-- `SUPABASE_SERVICE_KEY`: For server-side Supabase operations
-- `ADMIN_SECRET_KEY`: Any secure password for `/admin` dashboard
-
-### 3. Supabase setup
-
-Run this SQL in your Supabase project:
+Optional analytics table (Supabase):
 
 ```sql
 create table searches (
@@ -82,30 +71,14 @@ create table searches (
   dest_lng double precision,
   direct_price numeric(10,2),
   best_price numeric(10,2),
-  savings numeric(10,2),
+  savings numeric(10,2),   -- net benefit of the best option, 0 when the verdict was "just ride"
   walking_minutes integer,
   provider text,
   ip_hash text
 );
-
-create index searches_created_at_idx on searches(created_at);
-create index searches_destination_idx on searches(destination);
 ```
 
-### 4. Run
-
-```bash
-npm run dev
-# Open http://localhost:3000
-```
-
-### 5. Deploy to Vercel
-
-```bash
-vercel deploy
-```
-
-Set environment variables in Vercel dashboard.
+Deploy with `vercel deploy` and set the same variables in the Vercel dashboard.
 
 ## Admin Dashboard
 
@@ -116,34 +89,25 @@ Visit `/admin?key=YOUR_ADMIN_SECRET_KEY` to see:
 
 ## Rate Limiting
 
-Free tier: 10 searches per IP per day. Stored in memory (resets on server restart) and Supabase for analytics.
+10 searches per IP per day, held in memory per server instance (so it resets on restart and is approximate on serverless).
 
 ## Architecture
 
 ```
-providers/
-  types.ts      # FareProvider interface
-  uber.ts       # UberAdapter (€2.50 + €1.20/km + €0.20/min)
-  bolt.ts       # BoltAdapter (€1.80 + €0.95/km + €0.15/min)
-  index.ts      # Factory + registry
-
 lib/
-  geocoding.ts  # Nominatim geocoding
-  candidates.ts # Generate drop-off candidates (concentric rings)
-  walking.ts    # ORS walking route calculation
-  scoring.ts    # savings score algorithm
-  rateLimit.ts  # IP-based rate limiting
-  supabase.ts   # Database client
+  search.ts      # pipeline: geocode -> candidates -> routes -> fares -> verdict
+  decision.ts    # net-benefit rule (the part that decides walk vs ride)
+  fare.ts        # fare model + calibration to a real quote
+  routing.ts     # OSRM driving, ORS walking, straight-line fallbacks
+  candidates.ts  # candidate drop-offs on the pickup-facing side
+  geocoding.ts   # Nominatim (throttled)
+  geo.ts         # distance / bearing helpers
+  rateLimit.ts   # per-IP daily limit (in-memory)
+  supabase.ts    # optional analytics
+tests/           # decision rule, fare model, candidates, full pipeline with stubbed services
 ```
 
-The `FareProvider` interface is designed for future real API integration:
-
-```typescript
-interface FareProvider {
-  name: string;
-  getFareEstimate(pickup: Coordinates, dropoff: Coordinates): Promise<FareEstimate>
-}
-```
+If OSRM or ORS is down the app degrades to straight-line estimates and shows a warning instead of failing.
 
 ---
 

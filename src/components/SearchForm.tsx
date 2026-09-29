@@ -2,57 +2,75 @@
 
 /**
  * SearchForm component.
- * Pickup + destination text inputs, walking time selector, submit button.
+ * Route, walking limit, provider, and the two inputs that make the answer honest:
+ * the real fare from the app and how much the user values their time.
  */
 
 import { useState, type FormEvent } from 'react'
-import type { SearchRequest } from '@/providers/types'
+import type { ProviderId, SearchRequest, WalkMinutes } from '@/lib/types'
 
 interface SearchFormProps {
   onSearch: (request: SearchRequest) => void
   isLoading: boolean
 }
 
-const WALKING_OPTIONS: { value: SearchRequest['maxWalkingMinutes']; label: string }[] = [
-  { value: 3, label: '3 min (~250m)' },
-  { value: 5, label: '5 min (~400m)' },
-  { value: 10, label: '10 min (~800m)' },
-  { value: 15, label: '15 min (~1.2km)' },
+const WALKING_OPTIONS: WalkMinutes[] = [3, 5, 10, 15]
+
+const PROVIDER_OPTIONS: { value: ProviderId; label: string }[] = [
+  { value: 'bolt', label: 'Bolt' },
+  { value: 'uber', label: 'Uber' },
 ]
 
-const PROVIDER_OPTIONS: { value: SearchRequest['provider']; label: string }[] = [
-  { value: 'both', label: 'Uber & Bolt' },
-  { value: 'uber', label: 'Uber only' },
-  { value: 'bolt', label: 'Bolt only' },
-]
+const INPUT_CLASS = `w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-600
+  bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white
+  placeholder-gray-400 dark:placeholder-gray-500
+  focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent
+  disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200`
+
+const LABEL_CLASS = 'block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5'
+
+function toggleClass(active: boolean): string {
+  return `flex-1 py-2.5 px-3 rounded-xl text-sm font-semibold transition-all duration-200
+    focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-1
+    disabled:opacity-50 disabled:cursor-not-allowed ${
+      active
+        ? 'bg-emerald-500 text-white shadow-md'
+        : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-emerald-50 dark:hover:bg-gray-600'
+    }`
+}
 
 export default function SearchForm({ onSearch, isLoading }: SearchFormProps) {
   const [pickup, setPickup] = useState('')
   const [destination, setDestination] = useState('')
-  const [maxWalkingMinutes, setMaxWalkingMinutes] = useState<SearchRequest['maxWalkingMinutes']>(5)
-  const [provider, setProvider] = useState<SearchRequest['provider']>('both')
+  const [maxWalkingMinutes, setMaxWalkingMinutes] = useState<WalkMinutes>(10)
+  const [provider, setProvider] = useState<ProviderId>('bolt')
+  const [quote, setQuote] = useState('')
+  const [hourly, setHourly] = useState('15')
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault()
     if (!pickup.trim() || !destination.trim()) return
-    onSearch({ pickup: pickup.trim(), destination: destination.trim(), maxWalkingMinutes, provider })
+    const quoteNumber = parseFloat(quote.replace(',', '.'))
+    const hourlyNumber = parseFloat(hourly.replace(',', '.'))
+    onSearch({
+      pickup: pickup.trim(),
+      destination: destination.trim(),
+      maxWalkingMinutes,
+      provider,
+      directQuote: Number.isFinite(quoteNumber) && quoteNumber > 0 ? quoteNumber : undefined,
+      valueOfTimePerHour: Number.isFinite(hourlyNumber) && hourlyNumber >= 0 ? hourlyNumber : undefined,
+    })
   }
 
   return (
     <form
       onSubmit={handleSubmit}
       className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 space-y-5"
-      aria-label="Search for cheaper drop-off points"
+      aria-label="Check whether walking the last stretch saves money"
     >
       <div className="space-y-4">
-        {/* Pickup */}
         <div>
-          <label
-            htmlFor="pickup"
-            className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5"
-          >
-            📍 Pickup location
-          </label>
+          <label htmlFor="pickup" className={LABEL_CLASS}>📍 Pickup location</label>
           <input
             id="pickup"
             type="text"
@@ -60,25 +78,14 @@ export default function SearchForm({ onSearch, isLoading }: SearchFormProps) {
             onChange={(e) => setPickup(e.target.value)}
             placeholder="e.g. Amsterdam Centraal"
             required
+            maxLength={200}
             disabled={isLoading}
-            className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-600
-                       bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white
-                       placeholder-gray-400 dark:placeholder-gray-500
-                       focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent
-                       disabled:opacity-50 disabled:cursor-not-allowed
-                       transition-all duration-200"
-            aria-label="Pickup location"
+            className={INPUT_CLASS}
           />
         </div>
 
-        {/* Destination */}
         <div>
-          <label
-            htmlFor="destination"
-            className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5"
-          >
-            🏁 Destination
-          </label>
+          <label htmlFor="destination" className={LABEL_CLASS}>🏁 Destination</label>
           <input
             id="destination"
             type="text"
@@ -86,56 +93,15 @@ export default function SearchForm({ onSearch, isLoading }: SearchFormProps) {
             onChange={(e) => setDestination(e.target.value)}
             placeholder="e.g. Vondelpark, Amsterdam"
             required
+            maxLength={200}
             disabled={isLoading}
-            className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-600
-                       bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white
-                       placeholder-gray-400 dark:placeholder-gray-500
-                       focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent
-                       disabled:opacity-50 disabled:cursor-not-allowed
-                       transition-all duration-200"
-            aria-label="Destination"
+            className={INPUT_CLASS}
           />
         </div>
 
-        {/* Walking time */}
         <div>
-          <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-            🚶 Max walking time
-          </label>
-          <div className="grid grid-cols-4 gap-2" role="group" aria-label="Maximum walking time">
-            {WALKING_OPTIONS.map((opt) => (
-              <button
-                key={opt.value}
-                type="button"
-                onClick={() => setMaxWalkingMinutes(opt.value)}
-                disabled={isLoading}
-                aria-pressed={maxWalkingMinutes === opt.value}
-                className={`
-                  py-2.5 px-2 rounded-xl text-sm font-semibold transition-all duration-200
-                  focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-1
-                  disabled:opacity-50 disabled:cursor-not-allowed
-                  ${
-                    maxWalkingMinutes === opt.value
-                      ? 'bg-emerald-500 text-white shadow-md shadow-emerald-200 dark:shadow-emerald-900'
-                      : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-emerald-50 dark:hover:bg-gray-600'
-                  }
-                `}
-              >
-                {opt.label.split(' ')[0]}&nbsp;min
-              </button>
-            ))}
-          </div>
-          <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
-            {WALKING_OPTIONS.find((o) => o.value === maxWalkingMinutes)?.label}
-          </p>
-        </div>
-
-        {/* Provider */}
-        <div>
-          <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-            🚗 Provider
-          </label>
-          <div className="flex gap-2">
+          <label className={LABEL_CLASS}>🚗 App</label>
+          <div className="flex gap-2" role="group" aria-label="Ride app">
             {PROVIDER_OPTIONS.map((opt) => (
               <button
                 key={opt.value}
@@ -143,64 +109,82 @@ export default function SearchForm({ onSearch, isLoading }: SearchFormProps) {
                 onClick={() => setProvider(opt.value)}
                 disabled={isLoading}
                 aria-pressed={provider === opt.value}
-                className={`
-                  flex-1 py-2 px-3 rounded-xl text-sm font-medium transition-all duration-200
-                  focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-1
-                  disabled:opacity-50 disabled:cursor-not-allowed
-                  ${
-                    provider === opt.value
-                      ? 'bg-emerald-500 text-white shadow-md'
-                      : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-emerald-50 dark:hover:bg-gray-600'
-                  }
-                `}
+                className={toggleClass(provider === opt.value)}
               >
                 {opt.label}
               </button>
             ))}
           </div>
         </div>
+
+        <div>
+          <label htmlFor="quote" className={LABEL_CLASS}>
+            💶 Price the app shows for the direct ride{' '}
+            <span className="font-normal text-gray-400">(recommended)</span>
+          </label>
+          <input
+            id="quote"
+            type="text"
+            inputMode="decimal"
+            value={quote}
+            onChange={(e) => setQuote(e.target.value)}
+            placeholder="e.g. 14.50"
+            disabled={isLoading}
+            className={INPUT_CLASS}
+          />
+          <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+            Without it we only have a rough price model. With it, every estimate is scaled to what
+            the app really charges right now, surge included.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className={LABEL_CLASS}>🚶 Max walk</label>
+            <div className="grid grid-cols-4 gap-1.5" role="group" aria-label="Maximum walking time">
+              {WALKING_OPTIONS.map((minutes) => (
+                <button
+                  key={minutes}
+                  type="button"
+                  onClick={() => setMaxWalkingMinutes(minutes)}
+                  disabled={isLoading}
+                  aria-pressed={maxWalkingMinutes === minutes}
+                  className={toggleClass(maxWalkingMinutes === minutes)}
+                >
+                  {minutes}
+                </button>
+              ))}
+            </div>
+            <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">minutes</p>
+          </div>
+          <div>
+            <label htmlFor="hourly" className={LABEL_CLASS}>⏱ Your time is worth</label>
+            <div className="relative">
+              <input
+                id="hourly"
+                type="text"
+                inputMode="decimal"
+                value={hourly}
+                onChange={(e) => setHourly(e.target.value)}
+                disabled={isLoading}
+                className={`${INPUT_CLASS} pr-14`}
+              />
+              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-gray-400">€/hr</span>
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* Submit */}
       <button
         type="submit"
         disabled={isLoading || !pickup.trim() || !destination.trim()}
         className="w-full py-4 px-6 rounded-xl bg-emerald-500 hover:bg-emerald-600
-                   text-white font-bold text-base
-                   shadow-lg shadow-emerald-200 dark:shadow-emerald-900
+                   text-white font-bold text-base shadow-lg shadow-emerald-200 dark:shadow-emerald-900
                    focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2
                    disabled:opacity-50 disabled:cursor-not-allowed
                    transition-all duration-200 active:scale-[0.98]"
-        aria-label="Find cheapest drop-off point"
       >
-        {isLoading ? (
-          <span className="flex items-center justify-center gap-2">
-            <svg
-              className="animate-spin h-5 w-5 text-white"
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              aria-hidden="true"
-            >
-              <circle
-                className="opacity-25"
-                cx="12"
-                cy="12"
-                r="10"
-                stroke="currentColor"
-                strokeWidth="4"
-              />
-              <path
-                className="opacity-75"
-                fill="currentColor"
-                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-              />
-            </svg>
-            Searching...
-          </span>
-        ) : (
-          '💰 Find cheapest drop-off'
-        )}
+        {isLoading ? 'Checking routes…' : 'Is walking worth it?'}
       </button>
     </form>
   )

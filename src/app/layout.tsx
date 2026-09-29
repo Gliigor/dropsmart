@@ -2,23 +2,23 @@ import type { Metadata } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'DropSmart | Save on Uber & Bolt Rides',
+  title: 'DropSmart | Is walking the last bit worth it?',
   description:
-    'Find cheaper drop-off points near your destination. Save money on Uber and Bolt rides by walking the last few minutes.',
+    'Find out whether getting dropped off a few minutes early actually saves money on Uber and Bolt, after counting your time. Honest verdict, real road routing.',
   keywords: ['uber savings', 'bolt savings', 'cheap ride', 'walk drop-off', 'Amsterdam'],
   authors: [{ name: 'Gligorilla', url: 'https://gligor.xyz' }],
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? 'https://gligor.xyz'),
   openGraph: {
-    title: 'DropSmart | Save on Uber & Bolt Rides',
-    description: 'Save €2–10 per ride by walking the last few minutes. Free tool.',
+    title: 'DropSmart | Is walking the last bit worth it?',
+    description: 'Compare the fare saved against the time you spend. Free tool.',
     type: 'website',
     url: '/',
     siteName: 'DropSmart',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'DropSmart | Save on Uber & Bolt Rides',
-    description: 'Save €2–10 per ride by walking the last few minutes. Free tool.',
+    title: 'DropSmart | Is walking the last bit worth it?',
+    description: 'Compare the fare saved against the time you spend. Free tool.',
   },
   robots: {
     index: true,

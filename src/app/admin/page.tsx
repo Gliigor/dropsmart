@@ -9,7 +9,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
-import type { AdminStats } from '@/providers/types'
+import type { AdminStats } from '@/lib/types'
 import LoadingSpinner from '@/components/LoadingSpinner'
 import { Suspense } from 'react'
 

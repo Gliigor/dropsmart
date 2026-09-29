@@ -4,10 +4,28 @@
  * Terms of use: max 1 req/sec, must set User-Agent header.
  */
 
-import type { Coordinates } from '@/providers/types'
+import type { Coordinates } from './types'
 
 const NOMINATIM_BASE = 'https://nominatim.openstreetmap.org'
-const USER_AGENT = 'WalkForSavings/1.0 (https://gligor.xyz)'
+const USER_AGENT = 'DropSmart/2.0 (https://gligor.xyz)'
+
+/**
+ * Nominatim allows 1 request per second. Requests in this process are queued so they
+ * are at least MIN_INTERVAL apart (set NOMINATIM_MIN_INTERVAL_MS=0 in tests).
+ */
+let lastRequestAt = 0
+let queue: Promise<void> = Promise.resolve()
+
+function throttle(): Promise<void> {
+  const interval = Number(process.env.NOMINATIM_MIN_INTERVAL_MS ?? 1100)
+  const turn = queue.then(async () => {
+    const wait = lastRequestAt + interval - Date.now()
+    if (wait > 0) await new Promise((r) => setTimeout(r, wait))
+    lastRequestAt = Date.now()
+  })
+  queue = turn.catch(() => undefined)
+  return turn
+}
 
 export interface GeocodedLocation {
   lat: number
@@ -28,6 +46,7 @@ export async function geocodeAddress(query: string): Promise<GeocodedLocation> {
     addressdetails: '1',
   })
 
+  await throttle()
   const res = await fetch(`${NOMINATIM_BASE}/search?${params}`, {
     headers: { 'User-Agent': USER_AGENT },
     next: { revalidate: 3600 }, // cache geocoding results for 1 hour
@@ -73,6 +92,7 @@ export async function reverseGeocode(coords: Coordinates): Promise<string> {
   })
 
   try {
+    await throttle()
     const res = await fetch(`${NOMINATIM_BASE}/reverse?${params}`, {
       headers: { 'User-Agent': USER_AGENT },
       next: { revalidate: 86400 }, // cache reverse geocoding for 24 hours

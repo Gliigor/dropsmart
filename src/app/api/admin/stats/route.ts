@@ -9,7 +9,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getAdminStats } from '@/lib/supabase'
-import type { AdminStats, ApiError } from '@/providers/types'
+import type { AdminStats, ApiError } from '@/lib/types'
 
 export const runtime = 'nodejs'
 

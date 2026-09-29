@@ -11,7 +11,7 @@ import SearchForm from '@/components/SearchForm'
 import ResultsPanel from '@/components/ResultsPanel'
 import ErrorBanner from '@/components/ErrorBanner'
 import RateLimitBanner from '@/components/RateLimitBanner'
-import type { SearchRequest, SearchResult } from '@/providers/types'
+import type { SearchRequest, SearchResult } from '@/lib/types'
 
 // Dynamic import: Leaflet requires window (no SSR)
 const MapView = dynamic(() => import('@/components/MapView'), {
@@ -93,10 +93,10 @@ export default function HomePage() {
             <span className="text-2xl" aria-hidden="true">🚶</span>
             <div>
               <span className="font-black text-gray-900 dark:text-white text-lg leading-none">
-                Walk
+                Drop
               </span>
-              <span className="font-black text-emerald-500 text-lg leading-none ml-1">
-                For Savings
+              <span className="font-black text-emerald-500 text-lg leading-none">
+                Smart
               </span>
               <p className="text-[10px] text-gray-400 dark:text-gray-500 leading-none mt-0.5">
                 by gligor.xyz
@@ -121,22 +121,12 @@ export default function HomePage() {
       <section className="bg-gradient-to-br from-emerald-500 to-emerald-700 text-white py-10 px-4">
         <div className="max-w-3xl mx-auto text-center">
           <h1 className="text-3xl sm:text-4xl font-black leading-tight">
-            Save money on every ride
+            Is walking the last few minutes worth it?
           </h1>
           <p className="mt-3 text-emerald-100 text-lg">
-            Get dropped off nearby and walk the last few minutes. Save €2–10+ per ride.
+            We compare the fare saved against the time you spend, and tell you straight when the
+            answer is &quot;just take the ride&quot;.
           </p>
-          <div className="mt-4 flex flex-wrap justify-center gap-3 text-sm">
-            <span className="bg-white/20 backdrop-blur-sm px-3 py-1 rounded-full">
-              ✓ Free to use
-            </span>
-            <span className="bg-white/20 backdrop-blur-sm px-3 py-1 rounded-full">
-              ✓ Uber & Bolt estimates
-            </span>
-            <span className="bg-white/20 backdrop-blur-sm px-3 py-1 rounded-full">
-              ✓ Real walking routes
-            </span>
-          </div>
         </div>
       </section>
 
@@ -187,19 +177,19 @@ export default function HomePage() {
             <div className="grid sm:grid-cols-3 gap-6">
               {[
                 {
-                  icon: '📍',
-                  title: '1. Enter your route',
-                  desc: 'Type your pickup and destination. Works for any location in Amsterdam.',
+                  icon: '🗺️',
+                  title: '1. Real roads',
+                  desc: 'We route the ride on the actual road network, so drop-off points are places a car can stop, and one-way streets and detours are counted.',
                 },
                 {
-                  icon: '🔍',
-                  title: '2. We find alternatives',
-                  desc: 'Our algorithm generates candidate drop-off points near your destination and calculates real walking routes.',
+                  icon: '💶',
+                  title: '2. Your real price',
+                  desc: 'Enter the fare your app shows. We scale every estimate to it, so surge and current rates are included.',
                 },
                 {
-                  icon: '💰',
-                  title: '3. Save on your ride',
-                  desc: 'Choose from alternatives sorted by total cost (fare + walking time value). Save up to 30%.',
+                  icon: '⚖️',
+                  title: '3. Honest verdict',
+                  desc: 'Fare saved minus the value of your time. If walking does not clearly win, we say so.',
                 },
               ].map((step) => (
                 <div
@@ -213,14 +203,12 @@ export default function HomePage() {
               ))}
             </div>
 
-            {/* Disclaimer */}
             <div className="mt-8 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-2xl p-4 text-sm text-amber-800 dark:text-amber-300">
-              <p className="font-semibold mb-1">⚠️ About fare estimates</p>
+              <p className="font-semibold mb-1">⚠️ About prices</p>
               <p>
-                Uber and Bolt do not provide public APIs. All fares are estimated using known Amsterdam
-                pricing formulas and are clearly labeled as &quot;Estimated&quot;. Actual fares may differ
-                due to surge pricing, traffic, and routing. Always verify the fare in your ride-hailing app
-                before booking.
+                Uber and Bolt have no public price API, so without your quote the fare is a rough
+                model that may be out of date. Fares are dominated by base and minimum charges, so
+                for most short trips the honest answer is that walking saves very little.
               </p>
             </div>
           </section>
