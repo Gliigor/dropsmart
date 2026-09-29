@@ -89,7 +89,7 @@ Visit `/admin?key=YOUR_ADMIN_SECRET_KEY` to see:
 
 ## Rate Limiting
 
-10 searches per IP per day, held in memory per server instance (so it resets on restart and is approximate on serverless).
+Off by default. Set `RATE_LIMIT_PER_DAY` (e.g. `10`) to cap searches per IP per day; the count is held in memory per server instance, so it resets on restart and is approximate on serverless.
 
 ## Architecture
 

@@ -6,7 +6,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { checkRateLimit, getClientIp, hashIp } from '@/lib/rateLimit'
+import { checkRateLimit, getClientIp, getDailyLimit, hashIp } from '@/lib/rateLimit'
 import { SearchError, runSearch } from '@/lib/search'
 import { saveSearch } from '@/lib/supabase'
 import type { ApiError, ProviderId, SearchRequest, SearchResult, WalkMinutes } from '@/lib/types'
@@ -79,7 +79,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<SearchResult 
   if (!rateLimit.allowed) {
     return NextResponse.json(
       {
-        error: 'Rate limit exceeded. You have used all 10 free searches today.',
+        error: `Rate limit exceeded. You have used all ${getDailyLimit()} free searches today.`,
         code: 'RATE_LIMIT_EXCEEDED',
         remaining: 0,
       },
@@ -119,10 +119,13 @@ export async function POST(req: NextRequest): Promise<NextResponse<SearchResult 
     return NextResponse.json(
       { ...result, rateLimitRemaining: rateLimit.remaining },
       {
-        headers: {
-          'X-RateLimit-Remaining': rateLimit.remaining.toString(),
-          'X-RateLimit-Reset': rateLimit.resetAt.toISOString(),
-        },
+        headers:
+          rateLimit.remaining === null
+            ? {}
+            : {
+                'X-RateLimit-Remaining': rateLimit.remaining.toString(),
+                'X-RateLimit-Reset': rateLimit.resetAt.toISOString(),
+              },
       }
     )
   } catch (err) {

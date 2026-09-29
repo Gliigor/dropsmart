@@ -1,8 +1,8 @@
 /**
  * IP-based rate limiting for the DropSmart API.
  *
- * Free tier: 10 searches per IP per day.
- * Resets at midnight UTC.
+ * Opt-in: set RATE_LIMIT_PER_DAY (e.g. 10) to cap searches per IP per day.
+ * Unset or 0 means unlimited. Resets at midnight UTC.
  *
  * Implementation: in-memory Map for low-latency checks.
  * Also persists to Supabase for analytics (fire-and-forget).
@@ -13,7 +13,11 @@
  * moderate traffic, in-memory per-instance is a reasonable tradeoff.
  */
 
-const FREE_TIER_LIMIT = 10
+/** Daily searches per IP; 0 = unlimited. Read on every call so tests and redeploys pick up changes. */
+export function getDailyLimit(): number {
+  const parsed = parseInt(process.env.RATE_LIMIT_PER_DAY ?? '', 10)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 0
+}
 
 interface RateLimitEntry {
   count: number
@@ -42,21 +46,24 @@ function getNextMidnightUTC(): Date {
  */
 export function checkRateLimit(ip: string): {
   allowed: boolean
-  remaining: number
+  /** null when the limit is disabled */
+  remaining: number | null
   resetAt: Date
 } {
+  const limit = getDailyLimit()
   const now = new Date()
+  if (limit === 0) return { allowed: true, remaining: null, resetAt: getNextMidnightUTC() }
   const entry = rateLimitStore.get(ip)
 
   // No entry or expired entry → fresh start
   if (!entry || entry.resetAt <= now) {
     const resetAt = getNextMidnightUTC()
     rateLimitStore.set(ip, { count: 1, resetAt })
-    return { allowed: true, remaining: FREE_TIER_LIMIT - 1, resetAt }
+    return { allowed: true, remaining: limit - 1, resetAt }
   }
 
   // Over limit
-  if (entry.count >= FREE_TIER_LIMIT) {
+  if (entry.count >= limit) {
     return { allowed: false, remaining: 0, resetAt: entry.resetAt }
   }
 
@@ -64,7 +71,7 @@ export function checkRateLimit(ip: string): {
   entry.count++
   return {
     allowed: true,
-    remaining: FREE_TIER_LIMIT - entry.count,
+    remaining: limit - entry.count,
     resetAt: entry.resetAt,
   }
 }
@@ -74,18 +81,20 @@ export function checkRateLimit(ip: string): {
  * Used to show "X searches remaining" in the UI.
  */
 export function getRateLimitStatus(ip: string): {
-  remaining: number
+  remaining: number | null
   resetAt: Date
 } {
+  const limit = getDailyLimit()
+  if (limit === 0) return { remaining: null, resetAt: getNextMidnightUTC() }
   const now = new Date()
   const entry = rateLimitStore.get(ip)
 
   if (!entry || entry.resetAt <= now) {
-    return { remaining: FREE_TIER_LIMIT, resetAt: getNextMidnightUTC() }
+    return { remaining: limit, resetAt: getNextMidnightUTC() }
   }
 
   return {
-    remaining: Math.max(0, FREE_TIER_LIMIT - entry.count),
+    remaining: Math.max(0, limit - entry.count),
     resetAt: entry.resetAt,
   }
 }

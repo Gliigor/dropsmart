@@ -84,7 +84,8 @@ export interface SearchResult {
   routingSource: 'osrm' | 'estimated'
   walkingSource: 'ors' | 'estimated'
   warnings: string[]
-  rateLimitRemaining: number
+  /** null when no daily limit is configured */
+  rateLimitRemaining: number | null
 }
 
 export interface ApiError {
